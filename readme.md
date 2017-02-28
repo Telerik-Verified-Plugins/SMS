@@ -1,12 +1,14 @@
 #Cordova SMS Plugin
 
-Cross-platform plugin for Cordova / PhoneGap to to easily send SMS. Available for **Android**, **iOS**, and **Windows Phone 8**.
-
-This plugin works with Cordova 3.x and 4.x version.
+Cross-platform plugin for Cordova / PhoneGap to to easily send SMS. Available for **Android**, **iOS**, **Windows Phone 8** and **Windows 10 Universal (BETA)**.
 
 ##Installing the plugin
 
-Using the Cordova CLI, run:
+Using the Cordova CLI and NPM, run:
+
+    cordova plugin add cordova-sms-plugin
+
+It is also possible to install via repo url directly (unstable), run :
 
     cordova plugin add https://github.com/cordova-sms/cordova-sms-plugin.git
 
@@ -23,11 +25,11 @@ Javascript
         sendSms: function() {
             var number = document.getElementById('numberTxt').value;
             var message = document.getElementById('messageTxt').value;
-            alert(number);
-            alert(message);
+            console.log("number=" + number + ", message= " + message);
   
             //CONFIGURATION
             var options = {
+                replaceLineBreaks: false, // true to replace \n by a new line, false by default
                 android: {
                     intent: 'INTENT'  // send SMS with the native android SMS messaging
                     //intent: '' // send SMS without open any other app
@@ -40,9 +42,48 @@ Javascript
         }
     };
 
-##FAQ
+On Android, an extra function is exposed to know whether or not you have the permission to send a SMS (Android Marshmallow permission).
 
-###I get this error. What's wrong?
+    var app = {
+        checkSMSPermission: function() {
+            var success = function (hasPermission) { 
+                if (hasPermission) {
+                    sms.send(...);
+                }
+                else {
+                    // show a helpful message to explain why you need to require the permission to send a SMS
+                    // read http://developer.android.com/training/permissions/requesting.html#explain for more best practices
+                }
+            };
+            var error = function (e) { alert('Something went wrong:' + e); };
+            sms.hasPermission(success, error);
+        }
+    };
+
+##FAQ
+####`sms` is undefined
+
+Please go through all the [closed issues about this subject](https://github.com/cordova-sms/cordova-sms-plugin/issues?q=is%3Aissue+is%3Aclosed+sms+label%3A%22sms+undefined%22). The issue is mostly coming from the way you installed the plugin, please double check everything before opening another issue.
+
+####When building my project for android I get the following error: `cannot find symbol: cordova.hasPermission(string)`
+
+You need to update `cordova-android` to the latest version (recommended), or at least to the version 5.1.1.
+
+`cordova platform update android` or `cordova platform update android@5.1.1` 
+
+####Is the plugin available on [Adobe PhoneGap Build](https://build.phonegap.com)?
+
+Yes, the plugin is available, please see instructions here: http://docs.phonegap.com/phonegap-build/configuring/plugins/. Use the npm or github source.
+
+####How can I receive SMS?
+
+You can't receive SMS via this plugin. This plugin only sends SMS.
+
+####Android immediately passes success back to app? 
+
+Please read [#issue 26](https://github.com/cordova-sms/cordova-sms-plugin/issues/26)
+
+####I get this error. What's wrong?
 
     compile:
         [javac] Compiling 4 source files to /Users/username/MyProject/platforms/android/bin/classes
@@ -69,7 +110,7 @@ The problem is that you need to make sure that you set the target to android-19 
     target=android-19
 
 
-#### How can I send an sms in my iOS app without passing control to the native app like it can be done on Android?
+##### How can I send an sms in my iOS app without passing control to the native app like it can be done on Android?
 
 This isn't possible on iOS. It requires that you show the user the native sms composer, to be able to send an sms.
 
