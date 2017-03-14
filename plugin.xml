@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns="http://www.phonegap.com/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
-           id="org.apache.cordova.plugin.sms"
-      version="0.1.1">
+        id="org.apache.cordova.plugin.sms"
+        version="0.1.2">
     <name>Sms</name>
     <description>Cordova SMS Send Plugin</description>
     <license>MIT</license>
@@ -10,7 +10,7 @@
 
     <engines>
       <engine name="cordova" version=">=3.0.0" />
-    </engines>    
+    </engines>
 
     <js-module src="www/sms.js" name="Sms">
         <clobbers target="window.sms" />
@@ -20,7 +20,7 @@
     <platform name="android">
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="Sms">
-                <param name="android-package" value="org.apache.cordova.plugin.sms.Sms"/>
+                <param name="android-package" value="com.cordova.plugins.sms.Sms"/>
             </feature>
         </config-file>
 
@@ -30,9 +30,10 @@
             <uses-feature android:name="android.hardware.telephony" android:required="false" />
         </config-file>
 
-        <source-file src="src/android/Sms.java" target-dir="src/org/apache/cordova/plugin/sms" />
+        <source-file src="src/android/Sms.java" target-dir="src/com/cordova/plugins/sms" />
     </platform>
 
+    <!-- wp8 -->
     <platform name="wp8">
         <source-file src="src/wp8/Sms.cs" />
 
@@ -53,5 +54,12 @@
         <header-file src="src/ios/Sms.h" />
         <source-file src="src/ios/Sms.m" />
         <framework src="MessageUI.framework" weak="true" />
+    </platform>
+
+    <!-- windows -->
+    <platform name="windows">
+        <js-module src="src/windows/SmsProxy.js" name="SmsProxy">
+            <merges target="" />
+        </js-module>
     </platform>
 </plugin>

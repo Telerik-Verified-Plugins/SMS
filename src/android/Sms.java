@@ -1,4 +1,4 @@
-package org.apache.cordova.plugin.sms;
+package com.cordova.plugins.sms;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -20,36 +20,94 @@ import org.json.JSONArray;
 import org.json.JSONException;
 
 public class Sms extends CordovaPlugin {
+
 	public final String ACTION_SEND_SMS = "send";
+
+	public final String ACTION_HAS_PERMISSION = "has_permission";
+
 	private static final String INTENT_FILTER_SMS_SENT = "SMS_SENT";
 
+	private static final int SEND_SMS_REQ_CODE = 0;
+
+	private CallbackContext callbackContext;
+
+	private JSONArray args;
+
 	@Override
-	public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
-
+	public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
+		this.callbackContext = callbackContext;
+		this.args = args;
 		if (action.equals(ACTION_SEND_SMS)) {
-			try {
-				String phoneNumber = args.getJSONArray(0).join(";").replace("\"", "");
-				String message = args.getString(1);
-				String method = args.getString(2);
-
-				if (!checkSupport()) {
-					callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "SMS not supported on this platform"));
-					return true;
-				}
-
-				if (method.equalsIgnoreCase("INTENT")) {
-					invokeSMSIntent(phoneNumber, message);
-					// always passes success back to the app
-					callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
-				} else {
-					send(callbackContext, phoneNumber, message);
-				}
-				return true;
-			} catch (JSONException ex) {
-				callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
+			if (hasPermission()) {
+				sendSMS();
+			} else {
+				requestPermission();
 			}
+			return true;
+		}
+		else if (action.equals(ACTION_HAS_PERMISSION)) {
+			callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, hasPermission()));
+			return true;
 		}
 		return false;
+	}
+
+	private boolean hasPermission() {
+		return cordova.hasPermission(android.Manifest.permission.SEND_SMS);
+	}
+
+	private void requestPermission() {
+		cordova.requestPermission(this, SEND_SMS_REQ_CODE, android.Manifest.permission.SEND_SMS);
+	}
+
+	public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+		for (int r : grantResults) {
+			if (r == PackageManager.PERMISSION_DENIED) {
+				callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "User has denied permission"));
+				return;
+			}
+		}
+		sendSMS();
+	}
+
+	private boolean sendSMS() {
+		cordova.getThreadPool().execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					//parsing arguments
+					String separator = ";";
+					if (android.os.Build.MANUFACTURER.equalsIgnoreCase("Samsung")) {
+						// See http://stackoverflow.com/questions/18974898/send-sms-through-intent-to-multiple-phone-numbers/18975676#18975676
+						separator = ",";
+					}
+					String phoneNumber = args.getJSONArray(0).join(separator).replace("\"", "");
+					String message = args.getString(1);
+					String method = args.getString(2);
+					boolean replaceLineBreaks = Boolean.parseBoolean(args.getString(3));
+
+					// replacing \n by new line if the parameter replaceLineBreaks is set to true
+					if (replaceLineBreaks) {
+						message = message.replace("\\n", System.getProperty("line.separator"));
+					}
+					if (!checkSupport()) {
+						callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "SMS not supported on this platform"));
+						return;
+					}
+					if (method.equalsIgnoreCase("INTENT")) {
+						invokeSMSIntent(phoneNumber, message);
+						// always passes success back to the app
+						callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
+					} else {
+						send(callbackContext, phoneNumber, message);
+					}
+					return;
+				} catch (JSONException ex) {
+					callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
+				}
+			}
+		});
+		return true;
 	}
 
 	private boolean checkSupport() {
@@ -72,8 +130,10 @@ public class Sms extends CordovaPlugin {
 			}
 		} else {
 			sendIntent = new Intent(Intent.ACTION_VIEW);
-			sendIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));
 			sendIntent.putExtra("sms_body", message);
+			// See http://stackoverflow.com/questions/7242190/sending-sms-using-intent-does-not-add-recipients-on-some-devices
+			sendIntent.putExtra("address", phoneNumber);
+			sendIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));
 		}
 		this.cordova.getActivity().startActivity(sendIntent);
 	}
@@ -82,9 +142,9 @@ public class Sms extends CordovaPlugin {
 		SmsManager manager = SmsManager.getDefault();
 		final ArrayList<String> parts = manager.divideMessage(message);
 
-		// by creating this broadcast receiver we can check whether or not the SMS was sent			
+		// by creating this broadcast receiver we can check whether or not the SMS was sent
 		final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
-				
+
 			boolean anyError = false; //use to detect if one of the parts failed
 			int partsCount = parts.size(); //number of parts to send
 
